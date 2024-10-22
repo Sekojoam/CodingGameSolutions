@@ -15,6 +15,74 @@ def debug_maze(maze):
         message += "\n"
     print(message[:-1], file=sys.stderr, flush=True)
 
+indexes = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+class Node:
+
+    def __init__(self, row, col, previous):
+        self.row = row
+        self.col = col
+        self.previous : Node = previous
+        self.branches : list[Node] = []
+        self.number = 0
+
+    def write_in_maze(self, maze, number=None):
+        if number == 0:
+            text = "0"
+        else:
+            self.number = self.previous.number + 1
+            text = indexes[self.number]
+        
+        maze[self.row][self.col] = text
+        debug("\n")
+        debug_maze(maze)
+    
+    def find_branches(self, maze):
+        for new_r, new_c in [
+            (self.row, self.col-1), 
+            (self.row, self.col+1), 
+            (self.row+1, self.col), 
+            (self.row-1, self.col),
+            ]:
+            lines = len(maze)
+            cols = len(maze[0])
+            if is_special_position(new_r, new_c, lines, cols):
+                new_r, new_c = correct_position(new_r, new_c, lines, cols)
+            if maze[new_r][new_c] == ".":
+                self.branches.append(Node(new_r, new_c, self))
+        return self.branches
+
+    def str_version(self):
+        return f"{self.row}-{self.col}"
+
+
+class Graph:
+
+    def __init__(self):
+        self.vertices : list[Node] = []
+        self.queue : list[Node] = []
+        self.order : list[str] = []
+
+    def bfs(self, first_row, first_column, maze):
+        node = Node(first_row, first_column, None)
+        self.vertices.append(node)
+        self.order.append(node.str_version())
+        node.write_in_maze(maze, 0)
+        branches = node.find_branches(maze)
+        self.queue.extend(branches)
+        bfsIndex = 0
+        for node in self.queue:
+            if node.str_version() in self.order:
+                debug(self.order)
+                debug(node.str_version())
+                continue
+            self.vertices.append(node)
+            self.order.append(node.str_version())
+            node.write_in_maze(maze)
+            node.find_branches(maze)
+            self.queue.extend(node.branches)
+            bfsIndex += 1
+        debug(f"solution found in {bfsIndex} rounds")
+
 def print_maze(maze):
     message = ""
     for i in maze:
@@ -23,23 +91,6 @@ def print_maze(maze):
         message += "\n"
     print(message[:-1])
 
-
-def find_non_wall_direction(maze, row, col, lines, width):
-    if maze[row][col] == "S":
-        return [(row, col, row, col)]
-    directions = []
-    for new_r, new_c in [
-        (row-1, col),
-        (row, col-1), 
-        (row+1, col), 
-        (row, col+1), 
-        ]:
-        if is_special_position(new_r, new_c, lines, width):
-            new_r, new_c = correct_position(new_r, new_c, lines, width)
-        if maze[new_r][new_c] == ".":
-            directions.append((new_r, new_c, row, col))
-            debug(f"{row}, {col} row, col")
-    return directions
 
 def correct_position(row, col, lines, cols):
     debug(f"{row} {col}", "old")
@@ -54,20 +105,7 @@ def correct_position(row, col, lines, cols):
     debug(f"{row} {col}", "new")
     return row, col
 
-def correct_old_position(row, col, lines, cols):
-    debug(f"{row} {col}", "old")
-    if col == cols:
-        col = 0
-    elif col < 0:
-        col = cols-1
-    if row == lines:
-        row = 0
-    elif row <0:
-        row = lines -1
-    debug(f"{row} {col}", "new")
-    return row, col
 def is_special_position(row, col, lines, cols):
-    debug(f"{row} {col}{width} {height}", "is_special_position")
     if col == cols:
         return True
     if col == -1:
@@ -76,21 +114,7 @@ def is_special_position(row, col, lines, cols):
         return True
     if row == -1:
         return True
-    debug("not special")
     return False
-
-
-def set_actual_row(maze, row, column, index, width):
-    debug(index, "indexxxx")
-    maze[row][column] = index
-    debug("\n")
-    debug_maze(maze)
-
-
-indexes = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-def get_index(row, column, maze):
-    debug(f"{row} {column}", "in_get_index")
-    return indexes.index(maze[row][column])
 
 start_row, start_column = 0,0
 width, height = [int(i) for i in input().split()]
@@ -104,40 +128,10 @@ for i in range(height):
         start_row = i
 
 
-
 debug(f"{width} {height}", "wh")
-# debug_maze(maze)
 debug(start_row, "start_row")
 debug(start_column, "start_column")
-index = 0
-directions = []
-while True:
-    if index == 0:
-        set_actual_row(maze, start_row, start_column, "0", width)
-        index += 1
-        continue
-    actual_directions = find_non_wall_direction(maze, start_row, start_column, height, width)
-    directions.extend(actual_directions)
-    debug(directions, "directions 1")
-    if not directions:
-        break
-    start_row, start_column, old_row, old_column = directions[0]
-    directions.remove((start_row, start_column, old_row, old_column))
-    debug(directions, "directions 2")
-    old_number = get_index(old_row, old_column, maze)
-    debug(old_number, "old_number")
-    debug(directions, "directions 2")
 
-    debug(directions, "directions")
-
-    set_actual_row(maze, start_row, start_column, str(indexes[old_number+1]), width)
-    index += 1
-    debug(start_row, "start_row")
-    debug(start_column, "start_column")
-# for line in maze:
-# for i in range(height):
-
-    # Write an answer using print
-    # To debug: print("Debug messages...", file=sys.stderr, flush=True)
-
+graph = Graph()
+graph.bfs(start_row, start_column, maze)
 print_maze(maze)
